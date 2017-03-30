@@ -49,7 +49,7 @@ def TestImage(img):
     img.show()
 
 
-def SplitTwitterMemeImage(img):
+def SplitTwitterMemeImage(img) -> (Image.Image, Image.Image):
     ysplit = -1
     w, h = img.size
     # img.crop((0,0,2,2)).show()
@@ -94,5 +94,6 @@ def SplitTwitterMemeImage(img):
     if ysplit > 0:
         img1 = img.crop((0, 0, w, ysplit))
         img2 = img.crop((0, ysplit, w, h))
-        img1.save('test-images/out-1.png', 'PNG')
-        img2.save('test-images/out-2.png', 'PNG')
+        return img1, img2
+    else:
+        raise Warning('No border to split')
