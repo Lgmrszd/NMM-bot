@@ -46,7 +46,7 @@ def TestImage(img):
                 img.putpixel((x, y), (0, 0, 0, 255))
             else:
                 img.putpixel((x, y), (255, 0, 0, 255))
-    img.show()
+    #img.show()
 
 
 def SplitTwitterMemeImage(img) -> (Image.Image, Image.Image):
@@ -81,7 +81,7 @@ def SplitTwitterMemeImage(img) -> (Image.Image, Image.Image):
         elif debug == 2:
             for x in range(w):
                 img.putpixel((x, y), av_pix)
-    img.show()
+    #img.show()
     #img.save('test-images/out.png', 'PNG')
     colored = False
     for y in range(y-1,-1,-1):
