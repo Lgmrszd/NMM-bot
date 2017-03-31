@@ -1,8 +1,10 @@
-import vk_api, time, requests
+import vk_api, time, requests, logging
 from PIL import Image
 import ImageCutter
 #urllib.urlretrieve(img, "...\img.jpg")
+logging.basicConfig(filename='NMM-bot.log', format='[%(asctime)s][%(levelname)s]:%(message)s', level=logging.DEBUG, datefmt='%d.%m.%Y %H:%M:%S')
 
+logging.info('Started')
 image_path = 'bot_images/'
 
 admin = 216726992
@@ -17,7 +19,8 @@ upload = vk_api.VkUpload(vk_session)
 try:
     vk_session.auth()
 except vk_api.AuthError as error_msg:
-    print(error_msg)
+    #print(error_msg)
+    logging.error(error_msg)
 
 vk = vk_session.get_api()
 
@@ -32,10 +35,11 @@ def send_vk_message(id, message, is_chat = False, attachment=None):
 def work_with_message(message, id, user_id, is_chat):
     global upload
     global to_work
-    print(message)
+    logging.debug(message)
     if message['body'] == 'exit':
         if user_id == admin:
             send_vk_message(id, 'завершаюсь...', is_chat)
+            logging.info('exiting...')
             to_work = False
         else:
             send_vk_message(id, 'Ты не мой хозяин, я не буду подчиняться!', is_chat)
@@ -73,11 +77,12 @@ def work_with_message(message, id, user_id, is_chat):
                         print('Error: ', err)
                         send_vk_message(id, 'не режется :(', is_chat)
                     else:
+                        send_vk_message(id, 'Получилось! Выгружаю...', is_chat)
                         img1.save(image_path+'out1_'+str(now_time)+'.png', 'PNG')
                         img2.save(image_path+'out2_'+str(now_time)+'.png', 'PNG')
                         vk_img1 = upload.photo_messages(image_path+'out1_'+str(now_time)+'.png')
                         vk_img2 = upload.photo_messages(image_path+'out2_'+str(now_time)+'.png')
-                        send_vk_message(id, 'ГОТОВО!!!', is_chat, attachment='photo'+str(vk_img1[0]['owner_id'])+'_'+str(vk_img1[0]['id'])+','+'photo'+str(vk_img2[0]['owner_id'])+'_'+str(vk_img2[0]['id']))
+                        send_vk_message(id, 'Вот:', is_chat, attachment='photo'+str(vk_img1[0]['owner_id'])+'_'+str(vk_img1[0]['id'])+','+'photo'+str(vk_img2[0]['owner_id'])+'_'+str(vk_img2[0]['id']))
                 else:
                     send_vk_message(id, 'ИМЕННО ПИКЧА, НИББА', is_chat)
         else:
@@ -100,7 +105,8 @@ def work_with_single_dialog(messages_list, dialog):
 
 def work_with_msg(dialogs):
     global to_work
-    print('NEW MESSAGS')
+    #print('NEW MESSAGS')
+    logging.info('New messages:')
     count = 3
     dialogs_to_work = []
     for d_n, dialog in enumerate(dialogs):
@@ -108,10 +114,12 @@ def work_with_msg(dialogs):
         count += dialog['unread']
         if 'chat_id' in message:
             dialogs_to_work.append({'is_chat': True, 'id': message['chat_id'], 'user_id': message['user_id'], 'chat_id': message['chat_id'], 'unread': dialog['unread']})
-            print('Из беседы "%s" (id беседы %d) %d непрочитанных сообщений. Последнее сообщение: "%s"' % (message['title'], message['chat_id'], dialog['unread'], message['body']))
+            logging.info('%d unread messages from chat "%s" (chat_id %d). Last message: "%s"' % (dialog['unread'], message['title'], message['chat_id'], message['body']))
+            #print('Из беседы "%s" (id беседы %d) %d непрочитанных сообщений. Последнее сообщение: "%s"' % (message['title'], message['chat_id'], dialog['unread'], message['body']))
         else:
             dialogs_to_work.append({'is_chat': False, 'id': message['user_id'], 'user_id': message['user_id'], 'unread': dialog['unread']})
-            print('От пользователя с id %d %d сообщений. Последнее сообщение: "%s"' % (message['user_id'], dialog['unread'], message['body']))
+            logging.info('%d unread messages from user_id %d. Last message: "%s"' % (dialog['unread'], message['user_id'], message['body']))
+            #print('От пользователя с id %d %d сообщений. Последнее сообщение: "%s"' % (message['user_id'], dialog['unread'], message['body']))
     messages = vk.messages.get(count=count)
     for dialog in dialogs_to_work:
         #print(dialog)
