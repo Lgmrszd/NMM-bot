@@ -11,7 +11,7 @@ def IsPixWhite(pix):
         r, g, b = tuple(255 - x for x in pix)
     else:
         r, g, b, _ = tuple(255 - x for x in pix)
-    return (r + 1) * (g + 1) * (b + 1) < 30
+    return max(r, g, b) < 20
 
 
 def IsPixBlack(pix):
@@ -19,7 +19,7 @@ def IsPixBlack(pix):
         r, g, b = pix
     else:
         r, g, b, _ = pix
-    return (r + 1) * (g + 1) * (b + 1) < 30
+    return max(r, g, b) < 30
 
 
 def IsPixGray(pix):
@@ -46,7 +46,7 @@ def TestImage(img):
                 img.putpixel((x, y), (0, 0, 0, 255))
             else:
                 img.putpixel((x, y), (255, 0, 0, 255))
-    #img.show()
+    img.show()
 
 
 def SplitTwitterMemeImage(img) -> (Image.Image, Image.Image):

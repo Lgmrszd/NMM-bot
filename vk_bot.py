@@ -8,20 +8,44 @@ image_path = 'bot_images/'
 admin = 216726992
 
 to_work = True
+f = open('login_data.txt', 'r')
+app_id, login, password = f.readline().split(':')
+f.close()
+vk_session = vk_api.VkApi(login, password)
+upload = vk_api.VkUpload(vk_session)
+
+try:
+    vk_session.auth()
+except vk_api.AuthError as error_msg:
+    print(error_msg)
+
+vk = vk_session.get_api()
 
 
-def work_with_chat_message(message, chat_id, vk):
+def send_vk_message(id, message, is_chat = False, attachment=None):
+    if is_chat:
+        vk.messages.send(chat_id=id, message=message, attachment=attachment)
+    else:
+        vk.messages.send(user_id=id, message=message, attachment=attachment)
+
+
+def work_with_message(message, id, user_id, is_chat):
     global upload
+    global to_work
     print(message)
-    if message['body'] == 'bot':
-        vk.messages.send(chat_id=chat_id, message='Yes my lord')
+    if message['body'] == 'exit':
+        if user_id == admin:
+            send_vk_message(id, 'завершаюсь...', is_chat)
+            to_work = False
+        else:
+            send_vk_message(id, 'Ты не мой хозяин, я не буду подчиняться!', is_chat)
     elif ('spell i🅱up' in message['body'].lower()) or ('spell icup' in message['body'].lower()):
-        vk.messages.send(chat_id=chat_id, message='HOLD THE MAYO')
+        send_vk_message(id, 'HOLD THE MAYO', is_chat)
     elif message['body'] == 'обрежь твитмем':
         if 'attachments' in message:
             att_s = message['attachments']
             if len(att_s) > 1:
-                vk.messages.send(chat_id=chat_id, message='только одна пикча, нибба.')
+                send_vk_message(id, 'только одна пикча, нибба.', is_chat)
             else:
                 print(att_s)
                 att = att_s[0]
@@ -47,40 +71,34 @@ def work_with_chat_message(message, chat_id, vk):
                         img1, img2 = ImageCutter.SplitTwitterMemeImage(pil_img)
                     except Warning as err:
                         print('Error: ', err)
-                        vk.messages.send(chat_id=chat_id, message='не режется :(')
+                        send_vk_message(id, 'не режется :(', is_chat)
                     else:
                         img1.save(image_path+'out1_'+str(now_time)+'.png', 'PNG')
                         img2.save(image_path+'out2_'+str(now_time)+'.png', 'PNG')
                         vk_img1 = upload.photo_messages(image_path+'out1_'+str(now_time)+'.png')
                         vk_img2 = upload.photo_messages(image_path+'out2_'+str(now_time)+'.png')
-                        vk.messages.send(chat_id=chat_id, message='ГОТОВО!!!', attachment='photo'+str(vk_img1[0]['owner_id'])+'_'+str(vk_img1[0]['id'])+','+'photo'+str(vk_img2[0]['owner_id'])+'_'+str(vk_img2[0]['id']))
+                        send_vk_message(id, 'ГОТОВО!!!', is_chat, attachment='photo'+str(vk_img1[0]['owner_id'])+'_'+str(vk_img1[0]['id'])+','+'photo'+str(vk_img2[0]['owner_id'])+'_'+str(vk_img2[0]['id']))
                 else:
-                    vk.messages.send(chat_id=chat_id, message='ИМЕННО ПИКЧА, НИББА')
+                    send_vk_message(id, 'ИМЕННО ПИКЧА, НИББА', is_chat)
         else:
-            vk.messages.send(chat_id=chat_id, message='Где пикча, нибба?')
+            send_vk_message(id, 'Где пикча, нибба?', is_chat)
     vk.messages.markAsRead(message_ids=message['id'])
 
 
-def work_with_private_message(message, user_id, vk):
+def work_with_private_message(message, user_id):
     print(message)
     vk.messages.markAsRead(message_ids=message['id'])
 
 
-def work_with_single_dialog(messages_list, dialog, vk):
+def work_with_single_dialog(messages_list, dialog):
     #print(dialog)
-    if dialog['is_chat']:
-        for message in messages_list:
-            if not (message['read_state']) and message['chat_id'] == dialog['chat_id']:
-                #print('m', message)
-                work_with_chat_message(message, dialog['chat_id'], vk)
-    else:
-        for message in messages_list:
-            if not (message['read_state']) and message['user_id'] == dialog['user_id']:
-                #print('m', message)
-                work_with_private_message(message, dialog['user_id'], vk)
+    for message in messages_list:
+        if not (message['read_state']) and ((message.get('user_id') == dialog['id']) or (message.get('chat_id') == dialog['id'])):
+            #print('m', message)
+            work_with_message(message, dialog['id'], dialog['user_id'], dialog['is_chat'])
 
 
-def work_with_msg(dialogs, vk):
+def work_with_msg(dialogs):
     global to_work
     print('NEW MESSAGS')
     count = 3
@@ -89,42 +107,27 @@ def work_with_msg(dialogs, vk):
         message = dialog['message']
         count += dialog['unread']
         if 'chat_id' in message:
-            dialogs_to_work.append({'is_chat': True, 'chat_id': message['chat_id'], 'unread': dialog['unread']})
+            dialogs_to_work.append({'is_chat': True, 'id': message['chat_id'], 'user_id': message['user_id'], 'chat_id': message['chat_id'], 'unread': dialog['unread']})
             print('Из беседы "%s" (id беседы %d) %d непрочитанных сообщений. Последнее сообщение: "%s"' % (message['title'], message['chat_id'], dialog['unread'], message['body']))
         else:
-            dialogs_to_work.append({'is_chat': False, 'user_id': message['user_id'], 'unread': dialog['unread']})
-            if message['user_id'] == admin and message['body'] == 'exit':
-                to_work = False
+            dialogs_to_work.append({'is_chat': False, 'id': message['user_id'], 'user_id': message['user_id'], 'unread': dialog['unread']})
             print('От пользователя с id %d %d сообщений. Последнее сообщение: "%s"' % (message['user_id'], dialog['unread'], message['body']))
     messages = vk.messages.get(count=count)
     for dialog in dialogs_to_work:
-        work_with_single_dialog(messages['items'], dialog, vk)
-
+        #print(dialog)
+        work_with_single_dialog(messages['items'], dialog)
 
 
 
 def main():
     global upload
     global to_work
-    f = open('login_data.txt', 'r')
-    app_id, login, password = f.readline().split(':')
-    f.close()
-    vk_session = vk_api.VkApi(login, password)
-    upload = vk_api.VkUpload(vk_session)
-
-    try:
-        vk_session.auth()
-    except vk_api.AuthError as error_msg:
-        print(error_msg)
-        return
-
-    vk = vk_session.get_api()
     while to_work:
         dialogs = vk.messages.getDialogs(unread=1)
         #print(dialogs)
         if dialogs['count']:
-            work_with_msg(dialogs['items'], vk)
-        time.sleep(0.5)
+            work_with_msg(dialogs['items'])
+        time.sleep(0.1)
 
 
 main()
