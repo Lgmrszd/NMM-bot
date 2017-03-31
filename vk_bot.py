@@ -2,7 +2,7 @@ import vk_api, time, requests, logging
 from PIL import Image
 import ImageCutter
 #urllib.urlretrieve(img, "...\img.jpg")
-logging.basicConfig(filename='NMM-bot.log', format='[%(asctime)s][%(levelname)s]:%(message)s', level=logging.DEBUG, datefmt='%d.%m.%Y %H:%M:%S')
+logging.basicConfig(filename='NMM-bot.log', format='[%(asctime)s][%(levelname)s]:%(message)s', level=logging.INFO, datefmt='%d.%m.%Y %H:%M:%S')
 
 logging.info('Started')
 image_path = 'bot_images/'
@@ -43,6 +43,9 @@ def work_with_message(message, id, user_id, is_chat):
             to_work = False
         else:
             send_vk_message(id, 'Ты не мой хозяин, я не буду подчиняться!', is_chat)
+    elif 'say my name' in message['body'].lower():
+        user_info = vk.users.get(user_ids=str(user_id), fields='maiden_name')
+        send_vk_message(id, 'You are %s %s' % (user_info[0]['first_name'], user_info[0]['last_name']), is_chat)
     elif ('spell i🅱up' in message['body'].lower()) or ('spell icup' in message['body'].lower()):
         send_vk_message(id, 'HOLD THE MAYO', is_chat)
     elif message['body'] == 'обрежь твитмем':
@@ -112,13 +115,14 @@ def work_with_msg(dialogs):
     for d_n, dialog in enumerate(dialogs):
         message = dialog['message']
         count += dialog['unread']
+        user_info = vk.users.get(user_ids=str(message['user_id']), fields='maiden_name')
         if 'chat_id' in message:
             dialogs_to_work.append({'is_chat': True, 'id': message['chat_id'], 'user_id': message['user_id'], 'chat_id': message['chat_id'], 'unread': dialog['unread']})
-            logging.info('%d unread messages from chat "%s" (chat_id %d). Last message: "%s"' % (dialog['unread'], message['title'], message['chat_id'], message['body']))
+            logging.info('%d unread messages from chat "%s" (chat_id %d) from user %s %s (user_id %d). Last message: "%s"' % (dialog['unread'], message['title'], message['chat_id'], user_info[0]['first_name'], user_info[0]['last_name'], message['user_id'], message['body']))
             #print('Из беседы "%s" (id беседы %d) %d непрочитанных сообщений. Последнее сообщение: "%s"' % (message['title'], message['chat_id'], dialog['unread'], message['body']))
         else:
             dialogs_to_work.append({'is_chat': False, 'id': message['user_id'], 'user_id': message['user_id'], 'unread': dialog['unread']})
-            logging.info('%d unread messages from user_id %d. Last message: "%s"' % (dialog['unread'], message['user_id'], message['body']))
+            logging.info('%d unread messages from %s %s (user_id %d). Last message: "%s"' % (dialog['unread'], user_info[0]['first_name'], user_info[0]['last_name'], message['user_id'], message['body']))
             #print('От пользователя с id %d %d сообщений. Последнее сообщение: "%s"' % (message['user_id'], dialog['unread'], message['body']))
     messages = vk.messages.get(count=count)
     for dialog in dialogs_to_work:
