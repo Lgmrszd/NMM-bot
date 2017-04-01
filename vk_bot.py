@@ -47,7 +47,7 @@ def work_with_message(message, pid, user_id, is_chat):
     logging.debug(message)
     if message['body'] == 'exit':
         if user_id in admins:
-            send_vk_message(pid, 'завершаюсь...', is_chat)
+            send_vk_message(pid, 'exiting...', is_chat)
             logging.info('exiting...')
             to_work = False
         else:
@@ -57,7 +57,7 @@ def work_with_message(message, pid, user_id, is_chat):
         send_vk_message(pid, 'You are %s %s' % (user_info[0]['first_name'], user_info[0]['last_name']), is_chat)
     elif ('spell i🅱up' in message['body'].lower()) or ('spell icup' in message['body'].lower()):
         send_vk_message(pid, 'HOLD THE MAYO', is_chat)
-    elif message['body'] == 'обрежь твитмем':
+    elif 'trim twitmeme' in message['body'].lower():
         if 'attachments' in message:
             att_s = message['attachments']
             if len(att_s) > 1:
