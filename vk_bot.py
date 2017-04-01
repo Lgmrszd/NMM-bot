@@ -1,18 +1,27 @@
-import vk_api, time, requests, logging
+# -*- coding: utf-8 -*-
+import logging
+import requests
+import time
+import vk_api
+import platform
 from PIL import Image
+
 import ImageCutter
+
+platform_string = ' '.join(platform.uname())
 #urllib.urlretrieve(img, "...\img.jpg")
 logging.basicConfig(filename='NMM-bot.log', format='[%(asctime)s][%(levelname)s]:%(message)s', level=logging.INFO, datefmt='%d.%m.%Y %H:%M:%S')
 
-logging.info('Started')
+logging.info('Started at '+platform_string)
 image_path = 'bot_images/'
 
-admin = 216726992
+admins = [216726992, 169295669]
 
 to_work = True
 f = open('login_data.txt', 'r')
 app_id, login, password = f.readline().split(':')
 f.close()
+password = password.split('\n')[0]
 vk_session = vk_api.VkApi(login, password)
 upload = vk_api.VkUpload(vk_session)
 
@@ -25,34 +34,34 @@ except vk_api.AuthError as error_msg:
 vk = vk_session.get_api()
 
 
-def send_vk_message(id, message, is_chat = False, attachment=None):
+def send_vk_message(pid, message, is_chat = False, attachment=None):
     if is_chat:
-        vk.messages.send(chat_id=id, message=message, attachment=attachment)
+        vk.messages.send(chat_id=pid, message=message, attachment=attachment)
     else:
-        vk.messages.send(user_id=id, message=message, attachment=attachment)
+        vk.messages.send(user_id=pid, message=message, attachment=attachment)
 
 
-def work_with_message(message, id, user_id, is_chat):
+def work_with_message(message, pid, user_id, is_chat):
     global upload
     global to_work
     logging.debug(message)
     if message['body'] == 'exit':
-        if user_id == admin:
-            send_vk_message(id, 'завершаюсь...', is_chat)
+        if user_id in admins:
+            send_vk_message(pid, 'завершаюсь...', is_chat)
             logging.info('exiting...')
             to_work = False
         else:
-            send_vk_message(id, 'Ты не мой хозяин, я не буду подчиняться!', is_chat)
+            send_vk_message(pid, 'Ты не мой хозяин, я не буду подчиняться!', is_chat)
     elif 'say my name' in message['body'].lower():
         user_info = vk.users.get(user_ids=str(user_id), fields='maiden_name')
-        send_vk_message(id, 'You are %s %s' % (user_info[0]['first_name'], user_info[0]['last_name']), is_chat)
+        send_vk_message(pid, 'You are %s %s' % (user_info[0]['first_name'], user_info[0]['last_name']), is_chat)
     elif ('spell i🅱up' in message['body'].lower()) or ('spell icup' in message['body'].lower()):
-        send_vk_message(id, 'HOLD THE MAYO', is_chat)
+        send_vk_message(pid, 'HOLD THE MAYO', is_chat)
     elif message['body'] == 'обрежь твитмем':
         if 'attachments' in message:
             att_s = message['attachments']
             if len(att_s) > 1:
-                send_vk_message(id, 'только одна пикча, нибба.', is_chat)
+                send_vk_message(pid, 'только одна пикча, нибба.', is_chat)
             else:
                 print(att_s)
                 att = att_s[0]
@@ -78,18 +87,22 @@ def work_with_message(message, id, user_id, is_chat):
                         img1, img2 = ImageCutter.SplitTwitterMemeImage(pil_img)
                     except Warning as err:
                         print('Error: ', err)
-                        send_vk_message(id, 'не режется :(', is_chat)
+                        send_vk_message(pid, 'unable to trim :(', is_chat)
                     else:
-                        send_vk_message(id, 'Получилось! Выгружаю...', is_chat)
+                        send_vk_message(pid, 'Done! Uploading...', is_chat)
                         img1.save(image_path+'out1_'+str(now_time)+'.png', 'PNG')
                         img2.save(image_path+'out2_'+str(now_time)+'.png', 'PNG')
-                        vk_img1 = upload.photo_messages(image_path+'out1_'+str(now_time)+'.png')
-                        vk_img2 = upload.photo_messages(image_path+'out2_'+str(now_time)+'.png')
-                        send_vk_message(id, 'Вот:', is_chat, attachment='photo'+str(vk_img1[0]['owner_id'])+'_'+str(vk_img1[0]['id'])+','+'photo'+str(vk_img2[0]['owner_id'])+'_'+str(vk_img2[0]['id']))
+                        try:
+                            vk_img1 = upload.photo_messages(image_path+'out1_'+str(now_time)+'.png')
+                            vk_img2 = upload.photo_messages(image_path+'out2_'+str(now_time)+'.png')
+                            send_vk_message(pid, 'Here:', is_chat, attachment='photo' + str(vk_img1[0]['owner_id']) + '_' + str(vk_img1[0]['id']) + ',' + 'photo' + str(vk_img2[0]['owner_id']) + '_' + str(vk_img2[0]['id']))
+                        except vk_api.exceptions.ApiError as error_msg:
+                            logging.error('vk_api.exceptions.ApiError: '+str(error_msg))
+                            send_vk_message(pid, 'Error while uploading: ' + str(error_msg), is_chat)
                 else:
-                    send_vk_message(id, 'ИМЕННО ПИКЧА, НИББА', is_chat)
+                    send_vk_message(pid, 'ИМЕННО ПИКЧА, НИББА', is_chat)
         else:
-            send_vk_message(id, 'Где пикча, нибба?', is_chat)
+            send_vk_message(pid, 'Где пикча, нибба?', is_chat)
     vk.messages.markAsRead(message_ids=message['id'])
 
 
@@ -130,16 +143,19 @@ def work_with_msg(dialogs):
         work_with_single_dialog(messages['items'], dialog)
 
 
-
 def main():
     global upload
     global to_work
+    for uid in admins:
+        send_vk_message(uid, 'Bot started at platform '+platform_string, False)
     while to_work:
         dialogs = vk.messages.getDialogs(unread=1)
         #print(dialogs)
         if dialogs['count']:
             work_with_msg(dialogs['items'])
         time.sleep(0.1)
+    for uid in admins:
+        send_vk_message(uid, 'Bot stopped', False)
 
 
 main()
