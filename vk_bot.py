@@ -4,6 +4,9 @@ import requests
 import time
 import vk_api
 import platform
+import re
+import SimpleBot
+import templates
 from PIL import Image
 
 import ImageCutter
@@ -22,7 +25,7 @@ f = open('login_data.txt', 'r')
 app_id, login, password = f.readline().split(':')
 f.close()
 password = password.split('\n')[0]
-vk_session = vk_api.VkApi(login, password)
+vk_session = vk_api.VkApi(login, password, app_id=app_id)
 upload = vk_api.VkUpload(vk_session)
 
 try:
@@ -41,10 +44,34 @@ def send_vk_message(pid, message, is_chat = False, attachment=None):
         vk.messages.send(user_id=pid, message=message, attachment=attachment)
 
 
+def send_vk_unified_message(pid, message, is_chat = False):
+    att_string_all = None
+    if message.has_attachments:
+        att_string_all = ''
+        for att in message.attachments:
+            if att_string_all != '':
+                att_string_all += ','
+            if att.type == 'photo':
+                now_time = int(time.time())
+                try:
+                    vk_img = upload.photo_messages(att.path)
+                    att_string = 'photo' + str(vk_img[0]['owner_id']) + '_' + str(vk_img[0]['id'])
+                except vk_api.exceptions.ApiError as error_msg:
+                    logging.error('vk_api.exceptions.ApiError: ' + str(error_msg))
+                    message.body += '\n[error while uploading photo]'
+            att_string_all += att_string
+    if is_chat:
+        vk.messages.send(chat_id=pid, message=message.body, attachment=att_string_all)
+    else:
+        vk.messages.send(user_id=pid, message=message.body, attachment=att_string_all)
+
+
 def work_with_message(message, pid, user_id, is_chat):
     global upload
     global to_work
+    sender = SimpleBot.MessageSender({'pid': pid, 'is_chat': is_chat}, send_vk_unified_message)
     logging.debug(message)
+    msg = SimpleBot.VkMessage(message)
     if message['body'] == 'exit':
         if user_id in admins:
             send_vk_message(pid, 'exiting...', is_chat)
@@ -55,8 +82,6 @@ def work_with_message(message, pid, user_id, is_chat):
     elif 'say my name' in message['body'].lower():
         user_info = vk.users.get(user_ids=str(user_id), fields='maiden_name')
         send_vk_message(pid, 'You are %s %s' % (user_info[0]['first_name'], user_info[0]['last_name']), is_chat)
-    elif ('spell i🅱up' in message['body'].lower()) or ('spell icup' in message['body'].lower()):
-        send_vk_message(pid, 'HOLD THE MAYO', is_chat)
     elif 'trim twitmeme' in message['body'].lower():
         if 'attachments' in message:
             att_s = message['attachments']
@@ -92,17 +117,19 @@ def work_with_message(message, pid, user_id, is_chat):
                         send_vk_message(pid, 'Done! Uploading...', is_chat)
                         img1.save(image_path+'out1_'+str(now_time)+'.png', 'PNG')
                         img2.save(image_path+'out2_'+str(now_time)+'.png', 'PNG')
-                        try:
-                            vk_img1 = upload.photo_messages(image_path+'out1_'+str(now_time)+'.png')
-                            vk_img2 = upload.photo_messages(image_path+'out2_'+str(now_time)+'.png')
-                            send_vk_message(pid, 'Here:', is_chat, attachment='photo' + str(vk_img1[0]['owner_id']) + '_' + str(vk_img1[0]['id']) + ',' + 'photo' + str(vk_img2[0]['owner_id']) + '_' + str(vk_img2[0]['id']))
-                        except vk_api.exceptions.ApiError as error_msg:
-                            logging.error('vk_api.exceptions.ApiError: '+str(error_msg))
-                            send_vk_message(pid, 'Error while uploading: ' + str(error_msg), is_chat)
+                        msg = SimpleBot.Message('Here:')
+                        msg.add_photo(image_path+'out1_'+str(now_time)+'.png')
+                        msg.add_photo(image_path+'out2_'+str(now_time)+'.png')
+                        send_vk_unified_message(pid, msg, is_chat)
                 else:
                     send_vk_message(pid, 'ИМЕННО ПИКЧА, НИББА', is_chat)
         else:
             send_vk_message(pid, 'Где пикча, нибба?', is_chat)
+    else:
+        for k in templates.rules_templates.keys():
+            if re.search(k, msg.body):
+                res = templates.rules_templates[k](msg, sender)
+
     vk.messages.markAsRead(message_ids=message['id'])
 
 
@@ -147,7 +174,8 @@ def main():
     global upload
     global to_work
     for uid in admins:
-        send_vk_message(uid, 'Bot started at platform '+platform_string, False)
+        if False:
+            send_vk_message(uid, 'Bot started at platform '+platform_string, False)
     while to_work:
         dialogs = vk.messages.getDialogs(unread=1)
         #print(dialogs)
