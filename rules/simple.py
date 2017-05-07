@@ -12,6 +12,6 @@ def simple_respond(t, sender):
 
 
 templates = {
-    '^[Ss]ay\s[\w\s]+':simple_respond,
-    '[Ss][Pp][Ee][Ll][Ll]\s[Ii].[Uu][Pp]':simple_respond
+    '^[Ss]ay\s[\w\s]+': simple_respond,
+    '[Ss][Pp][Ee][Ll][Ll]\s[Ii].[Uu][Pp]': simple_respond
 }
